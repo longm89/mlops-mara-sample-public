@@ -24,10 +24,11 @@ class ModelTrainer:
         logging.info("start train_model")
         # init mlflow
         mlflow.set_tracking_uri(AppConfig.MLFLOW_TRACKING_URI)
+        print("abc")
         mlflow.set_experiment(
             f"{prob_config.phase_id}_{prob_config.prob_id}_{ModelTrainer.EXPERIMENT_NAME}"
         )
-
+        print("heheh")
         # load train data
         train_x, train_y = RawDataProcessor.load_train_data(prob_config)
         train_x = train_x.to_numpy()
