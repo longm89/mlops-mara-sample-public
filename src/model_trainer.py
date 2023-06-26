@@ -24,23 +24,15 @@ class ModelTrainer:
         logging.info("start train_model")
         # init mlflow
         mlflow.set_tracking_uri(AppConfig.MLFLOW_TRACKING_URI)
-        print("abc")
         mlflow.set_experiment(
             f"{prob_config.phase_id}_{prob_config.prob_id}_{ModelTrainer.EXPERIMENT_NAME}"
         )
-        print("heheh")
         # load train data
         train_x, train_y = RawDataProcessor.load_train_data(prob_config)
-        train_x = train_x.to_numpy()
-        train_y = train_y.to_numpy()
         logging.info(f"loaded {len(train_x)} samples")
 
         if add_captured_data:
             captured_x, captured_y = RawDataProcessor.load_capture_data(prob_config)
-            captured_x = captured_x.to_numpy()
-            captured_y = captured_y.to_numpy()
-            train_x = np.concatenate((train_x, captured_x))
-            train_y = np.concatenate((train_y, captured_y))
             logging.info(f"added {len(captured_x)} captured samples")
 
         # train model

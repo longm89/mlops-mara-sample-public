@@ -4,13 +4,14 @@ import pickle
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from optbinning import OptimalBinning
 
 from problem_config import ProblemConfig, ProblemConst, get_prob_config
 
 
 class RawDataProcessor:
     @staticmethod
-    def build_category_features(data, categorical_cols=None):
+    def build_category_features(data, categorical_cols, target_col):
         if categorical_cols is None:
             categorical_cols = []
         category_index = {}
@@ -21,8 +22,13 @@ class RawDataProcessor:
         # process category features
         for col in categorical_cols:
             df[col] = df[col].astype("category")
-            category_index[col] = df[col].cat.categories
-            df[col] = df[col].cat.codes
+            
+            optb = OptimalBinning(name=col, dtype="categorical", solver="cp")
+            optb.fit(df[col], df[target_col])
+            category_index[col] = optb
+
+            df[col] = category_index[col].transform(df[col], metric = "woe")
+
         return df, category_index
 
     @staticmethod
@@ -37,10 +43,8 @@ class RawDataProcessor:
         apply_df = raw_df.copy()
         for col in categorical_cols:
             apply_df[col] = apply_df[col].astype("category")
-            apply_df[col] = pd.Categorical(
-                apply_df[col],
-                categories=category_index[col],
-            ).codes
+            apply_df[col] = category_index[col].transform(apply_df[col], metric = "woe")
+
         return apply_df
 
     @staticmethod
@@ -48,7 +52,7 @@ class RawDataProcessor:
         logging.info("start process_raw_data")
         training_data = pd.read_parquet(prob_config.raw_data_path)
         training_data, category_index = RawDataProcessor.build_category_features(
-            training_data, prob_config.categorical_cols
+            training_data, prob_config.categorical_cols, prob_config.target_col
         )
         train, dev = train_test_split(
             training_data,
@@ -65,10 +69,10 @@ class RawDataProcessor:
         test_x = dev.drop([target_col], axis=1)
         test_y = dev[[target_col]]
 
-        train_x.to_parquet(prob_config.train_x_path, index=False)
-        train_y.to_parquet(prob_config.train_y_path, index=False)
-        test_x.to_parquet(prob_config.test_x_path, index=False)
-        test_y.to_parquet(prob_config.test_y_path, index=False)
+        train_x.to_parquet(prob_config.train_x_path)
+        train_y.to_parquet(prob_config.train_y_path)
+        test_x.to_parquet(prob_config.test_x_path)
+        test_y.to_parquet(prob_config.test_y_path)
         logging.info("finish process_raw_data")
 
     @staticmethod
