@@ -13,7 +13,8 @@ fi
 
 run_predictor() {
     model_config_path=$1
-    port=$2
+    model_config_path2=$2
+    port=$3
     if [[ -z "$model_config_path" ]]; then
         echo "Missing model_config_path"
         exit 1
@@ -25,7 +26,7 @@ run_predictor() {
 
     docker build -f deployment/model_predictor/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG .
     IMAGE_NAME=$IMAGE_NAME IMAGE_TAG=$IMAGE_TAG \
-        MODEL_CONFIG_PATH=$model_config_path PORT=$port \
+        MODEL_CONFIG_PATH=$model_config_path MODEL_CONFIG_PATH2=$model_config_path2 PORT=$port \
         docker-compose -f deployment/model_predictor/docker-compose.yml up -d
 }
 

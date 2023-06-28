@@ -40,6 +40,7 @@ class ModelPredictor:
         # load category_index
         self.category_index = RawDataProcessor.load_category_index(self.prob_config)
 
+        self.selected_features = RawDataProcessor.load_selected_features(self.prob_config)
         # load model
         model_uri = os.path.join(
             "models:/", self.config["model_name"], str(self.config["model_version"])
@@ -48,8 +49,7 @@ class ModelPredictor:
 
     def detect_drift(self, feature_df) -> int:
         # watch drift between coming requests and training data
-        time.sleep(0.02)
-        return random.choice([0, 1])
+        return 0
 
     def predict(self, data: Data):
         start_time = time.time()
@@ -61,12 +61,13 @@ class ModelPredictor:
             categorical_cols=self.prob_config.categorical_cols,
             category_index=self.category_index,
         )
+
         # save request data for improving models
         ModelPredictor.save_request_data(
             feature_df, self.prob_config.captured_data_dir, data.id
         )
 
-        prediction = self.model.predict(feature_df)
+        prediction = self.model.predict(feature_df[self.selected_features])
         is_drifted = self.detect_drift(feature_df)
 
         run_time = round((time.time() - start_time) * 1000, 0)
@@ -89,8 +90,9 @@ class ModelPredictor:
 
 
 class PredictorApi:
-    def __init__(self, predictor: ModelPredictor):
+    def __init__(self, predictor: ModelPredictor, predictor2: ModelPredictor):
         self.predictor = predictor
+        self.predictor2 = predictor2
         self.app = FastAPI()
 
         @self.app.get("/")
@@ -101,6 +103,13 @@ class PredictorApi:
         async def predict(data: Data, request: Request):
             self._log_request(request)
             response = self.predictor.predict(data)
+            self._log_response(response)
+            return response
+        
+        @self.app.post("/phase-1/prob-2/predict")
+        async def predict2(data: Data, request: Request):
+            self._log_request(request)
+            response = self.predictor2.predict(data)
             self._log_response(response)
             return response
 
@@ -125,10 +134,12 @@ if __name__ == "__main__":
     ).as_posix()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path", type=str, default=default_config_path)
+    parser.add_argument("--config-path", type=str)
+    parser.add_argument("--config-path2", type=str)
     parser.add_argument("--port", type=int, default=PREDICTOR_API_PORT)
     args = parser.parse_args()
 
     predictor = ModelPredictor(config_file_path=args.config_path)
-    api = PredictorApi(predictor)
+    predictor2 = ModelPredictor(config_file_path=args.config_path2)
+    api = PredictorApi(predictor, predictor2)
     api.run(port=args.port)

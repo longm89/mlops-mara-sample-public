@@ -23,8 +23,8 @@ class RawDataProcessor:
         for col in categorical_cols:
             df[col] = df[col].astype("category")
             
-            optb = OptimalBinning(name=col, dtype="categorical", solver="cp")
-            optb.fit(df[col], df[target_col])
+            optb = OptimalBinning(name=col, dtype="categorical", solver="mip")
+            optb.fit(df[col], df[target_col].values)
             category_index[col] = optb
 
             df[col] = category_index[col].transform(df[col], metric = "woe")
@@ -41,10 +41,11 @@ class RawDataProcessor:
             return raw_df
 
         apply_df = raw_df.copy()
+        logging.info(categorical_cols)
         for col in categorical_cols:
             apply_df[col] = apply_df[col].astype("category")
             apply_df[col] = category_index[col].transform(apply_df[col], metric = "woe")
-
+        logging.info(apply_df.head())
         return apply_df
 
     @staticmethod
@@ -103,6 +104,11 @@ class RawDataProcessor:
         captured_x = pd.read_parquet(captured_x_path)
         captured_y = pd.read_parquet(captured_y_path)
         return captured_x, captured_y[prob_config.target_col]
+    
+    @staticmethod
+    def load_selected_features(prob_config: ProblemConfig):
+        with open(prob_config.selected_features_path, "rb") as f:
+            return pickle.load(f)
 
 
 if __name__ == "__main__":

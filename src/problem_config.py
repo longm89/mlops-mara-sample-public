@@ -18,6 +18,7 @@ class ProblemConfig:
     raw_data_path: str
     feature_config_path: str
     category_index_path: str
+    selected_features_path: str
     train_data_path: str
     train_x_path: str
     train_y_path: str
@@ -63,6 +64,9 @@ def create_prob_config(phase_id: str, prob_id: str) -> ProblemConfig:
 
     prob_config.category_index_path = (
         prob_config.train_data_path / "category_index.pickle"
+    )
+    prob_config.selected_features_path = (
+        prob_config.train_data_path / "selected_features.pickle"
     )
     prob_config.train_x_path = prob_config.train_data_path / "train_x.parquet"
     prob_config.train_y_path = prob_config.train_data_path / "train_y.parquet"

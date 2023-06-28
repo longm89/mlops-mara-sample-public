@@ -3,10 +3,11 @@ import logging
 
 import mlflow
 import numpy as np
-import xgboost as xgb
+from catboost import CatBoostClassifier
 from mlflow.models.signature import infer_signature
+from feature_selection import FeatureSelector
 from sklearn.metrics import roc_auc_score
-
+import pickle
 from problem_config import (
     ProblemConfig,
     ProblemConst,
@@ -17,7 +18,7 @@ from utils import AppConfig
 
 
 class ModelTrainer:
-    EXPERIMENT_NAME = "xgb-1"
+    EXPERIMENT_NAME = "catboost"
 
     @staticmethod
     def train_model(prob_config: ProblemConfig, model_params, add_captured_data=False):
@@ -35,17 +36,24 @@ class ModelTrainer:
             captured_x, captured_y = RawDataProcessor.load_capture_data(prob_config)
             logging.info(f"added {len(captured_x)} captured samples")
 
-        # train model
-        if len(np.unique(train_y)) == 2:
-            objective = "binary:logistic"
-        else:
-            objective = "multi:softprob"
-        model = xgb.XGBClassifier(objective=objective, **model_params)
-        model.fit(train_x, train_y)
+        # Do feature selection
+        all_cols = prob_config.numerical_cols + prob_config.categorical_cols
+        quasi_constant_feat = FeatureSelector.filter_quasi_constant(train_x, prob_config.numerical_cols, prob_config.categorical_cols)
+        logging.info(f"Removed quasi-constant: {quasi_constant_feat}")
+        remained_cols = [col for col in all_cols if col not in quasi_constant_feat]
 
+        remained_cols = FeatureSelector.feature_importance_random_forest(train_x[remained_cols], train_y)
+        logging.info(f"Keep {len(remained_cols)} for training")
+        # save selected features
+        with open(prob_config.selected_features_path, "wb") as f:
+            pickle.dump(remained_cols, f)
+
+        model = CatBoostClassifier(**model_params)
+        model.fit(train_x[remained_cols], train_y)
+        logging.info(f"Keep {len(remained_cols)} for training")
         # evaluate
         test_x, test_y = RawDataProcessor.load_test_data(prob_config)
-        predictions = model.predict(test_x)
+        predictions = model.predict(test_x[remained_cols])
         auc_score = roc_auc_score(test_y, predictions)
         metrics = {"test_auc": auc_score}
         logging.info(f"metrics: {metrics}")
@@ -53,7 +61,7 @@ class ModelTrainer:
         # mlflow log
         mlflow.log_params(model.get_params())
         mlflow.log_metrics(metrics)
-        signature = infer_signature(test_x, predictions)
+        signature = infer_signature(test_x[remained_cols], predictions)
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path=AppConfig.MLFLOW_MODEL_PREFIX,
