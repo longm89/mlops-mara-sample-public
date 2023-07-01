@@ -8,8 +8,6 @@ services:
       - ../../data/train_data:/sample_solution/data/train_data
       - ../../data/model_config:/sample_solution/data/model_config
       - ../../data/captured_data:/sample_solution/data/captured_data
-    ports:
-      - ${PORT}:8000
     environment:
       MODEL_CONFIG_PATH: ${MODEL_CONFIG_PATH}
       MODEL_CONFIG_PATH2: ${MODEL_CONFIG_PATH2}
@@ -17,3 +15,14 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     entrypoint: /bin/sh -c "python src/model_predictor.py --config-path ${MODEL_CONFIG_PATH} --config-path2 ${MODEL_CONFIG_PATH2} --port 8000"
+    ports:
+      - "8000"
+    scale: 6
+  nginx:
+    image: nginx:latest
+    ports:
+      - "5040:80"
+    volumes:
+      - /home/ubuntu/mlops-mara-sample-public/deployment/model_predictor/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - model_predictor
